@@ -79,3 +79,53 @@ min     -1.557463e-03
 75%      0.000000e+00
 max      6.313542e-06
 dtype: float64
+
+
+
+####################################################################
+####################################################################
+####################################################################
+####################################################################
+
+USE_NUMBA = False
+
+number of points = 8761
+0 slow_mpp_jit elapsed time = 0.163206[s]
+1 slow_mpp_jit elapsed time = 0.167645[s]
+2 slow_mpp_jit elapsed time = 0.159052[s]
+3 slow_mpp_jit elapsed time = 0.166102[s]
+0 singlediode elapsed time = 0.058287[s]
+1 singlediode elapsed time = 0.054926[s]
+2 singlediode elapsed time = 0.057167[s]
+3 singlediode elapsed time = 0.054014[s]
+(singlediode - slow_mpp_jit).abs()
+ count    8.761000e+03
+mean    -9.067401e-05
+std      2.059644e-04
+min     -1.549522e-03
+25%     -6.873591e-05
+50%     -2.308914e-08
+75%      0.000000e+00
+max      0.000000e+00
+dtype: float64
+
+
+number of points = 525601
+0 slow_mpp_jit elapsed time = 9.03347[s]
+1 slow_mpp_jit elapsed time = 9.13156[s]
+2 slow_mpp_jit elapsed time = 9.04388[s]
+3 slow_mpp_jit elapsed time = 9.06983[s]
+0 singlediode elapsed time = 3.38312[s]
+1 singlediode elapsed time = 3.04524[s]
+2 singlediode elapsed time = 3.03787[s]
+3 singlediode elapsed time = 3.08195[s]
+(singlediode - slow_mpp_jit).abs()
+ count    5.256010e+05
+mean    -9.334509e-05
+std      2.109775e-04
+min     -1.557723e-03
+25%     -6.835588e-05
+50%     -2.328990e-08
+75%      0.000000e+00
+max      0.000000e+00
+dtype: float64

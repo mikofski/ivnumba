@@ -9,6 +9,9 @@ import pvlib
 from pvlib import pvsystem
 
 
+# comment out @jit, @vectorize, and uncomment slow_vd_jit_vec if no numba
+
+
 @jit
 def bishop88_jit(vd, photocurrent, saturation_current, resistance_series,
                  resistance_shunt, nNsVth):
@@ -25,11 +28,8 @@ def bishop88_jit(vd, photocurrent, saturation_current, resistance_series,
     :param numeric resistance_shunt: shunt resitance [ohms]
     :param numeric nNsVth: product of thermal voltage ``Vth`` [V], diode
         ideality factor ``n``, and number of series cells ``Ns``
-    :param bool gradients: default returns only i, v, and p, returns gradients
-        if true
+
     :returns: tuple containing currents [A], voltages [V], power [W],
-        gradient ``di/dvd``, gradient ``dv/dvd``, gradient ``di/dv``,
-        gradient ``dp/dv``, and gradient ``d2p/dv/dvd``
     """
     a = np.exp(vd / nNsVth)
     b = 1.0 / resistance_shunt
@@ -42,6 +42,7 @@ def bishop88_jit(vd, photocurrent, saturation_current, resistance_series,
 @jit
 def bishop88_gradp_jit(vd, photocurrent, saturation_current, resistance_series,
              resistance_shunt, nNsVth):
+    """root finders only need dp/dv"""
     a = np.exp(vd / nNsVth)
     b = 1.0 / resistance_shunt
     i = photocurrent - saturation_current * (a - 1.0) - vd * b
@@ -74,12 +75,10 @@ def est_voc_jit(photocurrent, saturation_current, nNsVth):
         V_{oc, est}=n Ns V_{th} \\log \\left( \\frac{I_L}{I_0} + 1 \\right)
     [1] http://www.pveducation.org/pvcdrom/open-circuit-voltage
     """
-
     return nNsVth * np.log(photocurrent / saturation_current + 1.0)
 
 
-@vectorize([float64(float64, float64, float64, float64, float64, float64)],
-           target='cpu')
+@vectorize([float64(float64, float64, float64, float64, float64, float64)], target='cpu')
 def slow_vd_jit_vec(photocurrent, saturation_current, resistance_series,
                     resistance_shunt, nNsVth, voc_est):
     """
@@ -92,17 +91,23 @@ def slow_vd_jit_vec(photocurrent, saturation_current, resistance_series,
     vd = brentq(bishop88_gradp_jit, 0.0, voc_est, args)
     return vd
 
+# comment out if using numba
+#slow_vd_jit_vec = np.vectorize(slow_vd_jit_vec)
+
 
 @jit
 def slow_mpp_jit(photocurrent, saturation_current, resistance_series,
                  resistance_shunt, nNsVth):
     voc_est = est_voc_jit(photocurrent, saturation_current, nNsVth)
+    # root finder fails if bounds are both 0
     nonzeros = voc_est != 0
     IL_pos = photocurrent[nonzeros]
     RSH_pos = resistance_shunt[nonzeros]
     voc_est_pos = voc_est[nonzeros]
-    vd = slow_vd_jit_vec(IL_pos, saturation_current, resistance_series,
-                         RSH_pos, nNsVth, voc_est_pos)
+    vd_pos = slow_vd_jit_vec(IL_pos, saturation_current, resistance_series,
+                             RSH_pos, nNsVth, voc_est_pos)
+    vd = np.zeros_like(photocurrent)
+    vd[nonzeros] = vd_pos
     mpp = bishop88_jit(vd, photocurrent, saturation_current, resistance_series,
                        resistance_shunt, nNsVth)
     # guessing that some code is needed here to handle nans and/or
@@ -111,6 +116,8 @@ def slow_mpp_jit(photocurrent, saturation_current, resistance_series,
 
 
 def prepare_data():
+    print('preparing single diode data from clear sky ghi...')
+    # adjust values to change length of test data
     times = pd.DatetimeIndex(start='20180101', end='20190101', freq='1min', tz='America/Phoenix')
     location = pvlib.location.Location(32.2, -110.9, altitude=710)
     cs = location.get_clearsky(times)
