@@ -12,7 +12,7 @@ from pvlib import pvsystem
 # comment out @jit, @vectorize, and uncomment slow_vd_jit_vec if no numba
 
 
-@jit
+@jit(nopython=True)
 def bishop88_jit(vd, photocurrent, saturation_current, resistance_series,
                  resistance_shunt, nNsVth):
     """
@@ -39,7 +39,7 @@ def bishop88_jit(vd, photocurrent, saturation_current, resistance_series,
     return retval
 
 
-@jit
+@jit([float64(float64, float64, float64, float64, float64, float64)], nopython=True)
 def bishop88_gradp_jit(vd, photocurrent, saturation_current, resistance_series,
              resistance_shunt, nNsVth):
     """root finders only need dp/dv"""
@@ -56,7 +56,7 @@ def bishop88_gradp_jit(vd, photocurrent, saturation_current, resistance_series,
     return grad_p
 
 
-@jit
+@jit(nopython=True)
 def est_voc_jit(photocurrent, saturation_current, nNsVth):
     """
     Rough estimate of open circuit voltage useful for bounding searches for
@@ -95,7 +95,7 @@ def slow_vd_jit_vec(photocurrent, saturation_current, resistance_series,
 #slow_vd_jit_vec = np.vectorize(slow_vd_jit_vec)
 
 
-@jit
+@jit([float64(float64, float64, float64, float64, float64)])
 def slow_mpp_jit(photocurrent, saturation_current, resistance_series,
                  resistance_shunt, nNsVth):
     voc_est = est_voc_jit(photocurrent, saturation_current, nNsVth)
@@ -118,7 +118,7 @@ def slow_mpp_jit(photocurrent, saturation_current, resistance_series,
 def prepare_data():
     print('preparing single diode data from clear sky ghi...')
     # adjust values to change length of test data
-    times = pd.DatetimeIndex(start='20180101', end='20190101', freq='1min', tz='America/Phoenix')
+    times = pd.DatetimeIndex(start='20180101', end='20190101', freq='60min', tz='America/Phoenix')
     location = pvlib.location.Location(32.2, -110.9, altitude=710)
     cs = location.get_clearsky(times)
     poa_data = cs['ghi']
@@ -141,7 +141,10 @@ if __name__ == '__main__':
 
     for n in range(4):
         tstart = clock()
-        i_mp, v_mp, p_mp = slow_mpp_jit(IL, I0, Rs, Rsh, nNsVth)
+        i_mp, v_mp, p_mp = slow_mpp_jit(IL.values, I0, Rs, Rsh.values, nNsVth)
+        i_mp = pd.Series(i_mp, index=IL.index)
+        v_mp = pd.Series(v_mp, index=IL.index)
+        p_mp = pd.Series(p_mp, index=IL.index)
         tstop = clock()
         dt_slow = tstop - tstart
         print('%s slow_mpp_jit elapsed time = %g[s]' % (n, dt_slow))
