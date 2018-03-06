@@ -17,6 +17,10 @@ brentq_jit = jit(nopython=False)(brentq.brentq)
 
 from brentq_bishop import brentq_bishop
 
+xtol = 2e-12
+rtol = 1e-15
+# xtol = 1e-2  # doesn't change much
+
 #
 # def jit_in_context(fun, d, *args, **kwargs):
 #     # to get an AST of fun, without reference to initial module
@@ -121,7 +125,7 @@ def slow_vd_jit_vec(photocurrent, saturation_current, resistance_series,
     args = (photocurrent, saturation_current, resistance_series,
             resistance_shunt, nNsVth)
     # first bound the search using voc
-    vd = scipy.optimize.brentq(bishop88_gradp_jit, 0.0, voc_est, args)
+    vd = scipy.optimize.brentq(bishop88_gradp_jit, 0.0, voc_est, args, xtol, rtol)
     return vd
 
 
@@ -157,7 +161,7 @@ def slow_vd_jit_vec_brentq_jit(photocurrent, saturation_current, resistance_seri
     args = (photocurrent, saturation_current, resistance_series,
             resistance_shunt, nNsVth)
     # first bound the search using voc
-    vd = brentq_jit(bishop88_gradp_jit, 0.0, voc_est, 2e-12, 1e-15, 100, args)
+    vd = brentq_jit(bishop88_gradp_jit, 0.0, voc_est, xtol, rtol, 100, args)
     return vd
 
 
@@ -210,7 +214,7 @@ def slow_vd_jit_vec_brentq_bishop(photocurrent, saturation_current, resistance_s
     This is a slow but reliable way to find mpp.
     """
     # first bound the search using voc
-    vd = brentq_bishop(0.0, voc_est, 2e-12, 1e-15, 100,
+    vd = brentq_bishop(0.0, voc_est, xtol, rtol, 100,
             photocurrent, saturation_current, resistance_series,
             resistance_shunt, nNsVth)
     return vd
