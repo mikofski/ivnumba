@@ -39,39 +39,15 @@
 # */
 
 import numpy as np
+from numpy import abs
+from numpy import minimum as min
 
-from numba import njit, float64
-
-# @njit([(float64, float64, float64)(float64, float64, float64, float64, float64, float64)])
-@njit
-def bishop88_jit(vd, photocurrent, saturation_current, resistance_series,
-                 resistance_shunt, nNsVth):
-    """
-    Explicit calculation single-diode-model (SDM) currents and voltages using
-    diode junction voltages [1].
-    [1] "Computer simulation of the effects of electrical mismatches in
-    photovoltaic cell interconnection circuits" JW Bishop, Solar Cell (1988)
-    https://doi.org/10.1016/0379-6787(88)90059-2
-    :param numeric vd: diode voltages [V]
-    :param numeric photocurrent: photo-generated current [A]
-    :param numeric saturation_current: diode one reverse saturation current [A]
-    :param numeric resistance_series: series resitance [ohms]
-    :param numeric resistance_shunt: shunt resitance [ohms]
-    :param numeric nNsVth: product of thermal voltage ``Vth`` [V], diode
-        ideality factor ``n``, and number of series cells ``Ns``
-
-    :returns: tuple containing currents [A], voltages [V], power [W],
-    """
-    a = np.exp(vd / nNsVth)
-    b = 1.0 / resistance_shunt
-    i = photocurrent - saturation_current * (a - 1.0) - vd * b
-    v = vd - i * resistance_series
-    retval = i, v, i*v
-    return retval
+from numba import njit, float64, int32
 
 
-@njit([float64(float64, float64, float64, float64, float64, float64)])
-def bishop88_gradp_jit(vd, photocurrent, saturation_current, resistance_series,
+@njit([float64(float64, float64, float64, float64,
+    float64, float64)])
+def bishop88_gradp(vd, photocurrent, saturation_current, resistance_series,
              resistance_shunt, nNsVth):
     """root finders only need dp/dv"""
     a = np.exp(vd / nNsVth)
@@ -87,45 +63,38 @@ def bishop88_gradp_jit(vd, photocurrent, saturation_current, resistance_series,
     return grad_p
 
 
-@njit([float64(float64, float64, float64, float64, float64, float64, float64, float64, float64, float64, float64)])
+@njit([float64(float64, float64, float64, float64, int32,
+    float64, float64, float64,
+    float64, float64)])
 def brentq_bishop(xa, xb, xtol, rtol, iter,
-           vd, photocurrent, saturation_current, resistance_series,
+           photocurrent, saturation_current, resistance_series,
            resistance_shunt, nNsVth):
     xpre = xa
     xcur = xb
     xblk = 0.
-    # fpre
-    # fcur
     fblk = 0.
     spre = 0.
     scur = 0.
-    # sbis
 
     # the tolerance is 2*delta */
-    # delta
-    # stry, dpre, dblk
-    # i
 
-    fpre = bishop88_gradp_jit(xpre, photocurrent, saturation_current, resistance_series,
+    fpre = bishop88_gradp(xpre, photocurrent, saturation_current, resistance_series,
            resistance_shunt, nNsVth)
-    fcur = bishop88_gradp_jit(xcur, photocurrent, saturation_current, resistance_series,
+    fcur = bishop88_gradp(xcur, photocurrent, saturation_current, resistance_series,
            resistance_shunt, nNsVth)
-#     params->funcalls = 2
     if fpre*fcur > 0:
-#         params->error_num = SIGNERR;
         return 0.
     if fpre == 0:
         return xpre
     if fcur == 0:
         return xcur
 
-    iterations = 0
     for i in range(iter):
-        iterations += 1
         if fpre*fcur < 0:
-            xblk = xpre;
-            fblk = fpre;
-            spre = scur = xcur - xpre
+            xblk = xpre
+            fblk = fpre
+            scur = xcur - xpre
+            spre = scur
         if abs(fblk) < abs(fcur):
             xpre = xcur
             xcur = xblk
@@ -141,7 +110,7 @@ def brentq_bishop(xa, xb, xtol, rtol, iter,
             return xcur
 
         if (abs(spre) > delta) & (abs(fcur) < abs(fpre)):
-            if (xpre == xblk):
+            if xpre == xblk:
                 # interpolate
                 stry = -fcur*(xcur - xpre)/(fcur - fpre)
             else:
@@ -151,7 +120,7 @@ def brentq_bishop(xa, xb, xtol, rtol, iter,
                 stry = (-fcur*(fblk*dblk - fpre*dpre)
                     /(dblk*dpre*(fblk - fpre)))
             if 2*abs(stry) < min(abs(spre), 3*abs(sbis) - delta):
-                #good short step
+                # good short step
                 spre = scur
                 scur = stry
             else:
@@ -168,11 +137,12 @@ def brentq_bishop(xa, xb, xtol, rtol, iter,
         if abs(scur) > delta:
             xcur += scur
         else:
-            xcur += delta if sbis > 0 else -delta
+            if sbis > 0:
+                xcur += delta
+            else:
+                xcur -= delta
 
-        fcur = bishop88_gradp_jit(xcur, photocurrent, saturation_current, resistance_series,
+        fcur = bishop88_gradp(xcur, photocurrent, saturation_current, resistance_series,
            resistance_shunt, nNsVth)
-        i += 1
-#         params->funcalls++;
-#     params->error_num = CONVERR;
+
     return xcur

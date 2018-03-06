@@ -45,7 +45,7 @@ from brentq_bishop import brentq_bishop
 #     return myfun
 
 
-@jit(nopython=True)
+@njit
 def bishop88_jit(vd, photocurrent, saturation_current, resistance_series,
                  resistance_shunt, nNsVth):
     """
@@ -72,7 +72,7 @@ def bishop88_jit(vd, photocurrent, saturation_current, resistance_series,
     return retval
 
 
-@jit([float64(float64, float64, float64, float64, float64, float64)], nopython=True)
+@njit([float64(float64, float64, float64, float64, float64, float64)])
 def bishop88_gradp_jit(vd, photocurrent, saturation_current, resistance_series,
              resistance_shunt, nNsVth):
     """root finders only need dp/dv"""
@@ -89,7 +89,7 @@ def bishop88_gradp_jit(vd, photocurrent, saturation_current, resistance_series,
     return grad_p
 
 
-@jit(nopython=True)
+@njit
 def est_voc_jit(photocurrent, saturation_current, nNsVth):
     """
     Rough estimate of open circuit voltage useful for bounding searches for
@@ -161,22 +161,6 @@ def slow_vd_jit_vec_brentq_jit(photocurrent, saturation_current, resistance_seri
     return vd
 
 
-@vectorize([float64(float64, float64, float64, float64, float64, float64)], target='cpu')
-def slow_vd_jit_vec_brentq_bishop(photocurrent, saturation_current, resistance_series,
-                    resistance_shunt, nNsVth, voc_est):
-    """
-    This is a slow but reliable way to find mpp.
-    """
-    # first bound the search using voc
-    vd = brentq_bishop(0.0, voc_est, 2e-12, 1e-15, 100, photocurrent, saturation_current, resistance_series,
-            resistance_shunt, nNsVth)
-    return vd
-
-# comment out if using numba
-#slow_vd_jit_vec = np.vectorize(slow_vd_jit_vec)
-
-
-
 
 @jit([float64(float64, float64, float64, float64, float64)])
 def slow_mpp_jit_brentq_jit(photocurrent, saturation_current, resistance_series,
@@ -198,6 +182,7 @@ def slow_mpp_jit_brentq_jit(photocurrent, saturation_current, resistance_series,
     return mpp
 
 
+
 @jit([float64(float64, float64, float64, float64, float64)])
 def slow_mpp_jit_brentq_bishop(photocurrent, saturation_current, resistance_series,
                  resistance_shunt, nNsVth):
@@ -207,7 +192,7 @@ def slow_mpp_jit_brentq_bishop(photocurrent, saturation_current, resistance_seri
     IL_pos = photocurrent[nonzeros]
     RSH_pos = resistance_shunt[nonzeros]
     voc_est_pos = voc_est[nonzeros]
-    vd_pos = slow_vd_jit_vec_brentq_jit(IL_pos, saturation_current, resistance_series,
+    vd_pos = slow_vd_jit_vec_brentq_bishop(IL_pos, saturation_current, resistance_series,
                              RSH_pos, nNsVth, voc_est_pos)
     vd = np.zeros_like(photocurrent)
     vd[nonzeros] = vd_pos
@@ -216,6 +201,23 @@ def slow_mpp_jit_brentq_bishop(photocurrent, saturation_current, resistance_seri
     # guessing that some code is needed here to handle nans and/or
     # differences between pandas/numpy nonzeros indexing
     return mpp
+
+
+@vectorize([float64(float64, float64, float64, float64, float64, float64)], nopython=True, target='cpu')
+def slow_vd_jit_vec_brentq_bishop(photocurrent, saturation_current, resistance_series,
+                    resistance_shunt, nNsVth, voc_est):
+    """
+    This is a slow but reliable way to find mpp.
+    """
+    # first bound the search using voc
+    vd = brentq_bishop(0.0, voc_est, 2e-12, 1e-15, 100,
+            photocurrent, saturation_current, resistance_series,
+            resistance_shunt, nNsVth)
+    return vd
+
+# comment out if using numba
+#slow_vd_jit_vec = np.vectorize(slow_vd_jit_vec)
+
 
 
 def prepare_data():
@@ -266,15 +268,8 @@ if __name__ == '__main__':
         dt_slow = tstop - tstart
         print('%s slow_mpp_jit elapsed time = %g[s]' % (n, dt_slow))
 
-    for n in range(4):
-        tstart = clock()
-        i_mp, v_mp, p_mp = slow_mpp_jit_brentq_jit(IL.values, I0, Rs, Rsh.values, nNsVth)
-        i_mp = pd.Series(i_mp, index=IL.index)
-        v_mp = pd.Series(v_mp, index=IL.index)
-        p_mp = pd.Series(p_mp, index=IL.index)
-        tstop = clock()
-        dt_slow = tstop - tstart
-        print('%s slow_mpp_jit_brentq_jit elapsed time = %g[s]' % (n, dt_slow))
+    print('(singlediode - slow_mpp_jit).abs()\n',
+          (singlediode_out['p_mp'] - p_mp.fillna(0)).describe())
 
     for n in range(4):
         tstart = clock()
@@ -286,5 +281,23 @@ if __name__ == '__main__':
         dt_slow = tstop - tstart
         print('%s slow_mpp_jit_brentq_bishop elapsed time = %g[s]' % (n, dt_slow))
 
-    print('(singlediode - slow_mpp_jit).abs()\n',
+    print('(singlediode - slow_mpp_jit_brentq_bishop).abs()\n',
           (singlediode_out['p_mp'] - p_mp.fillna(0)).describe())
+
+    for n in range(4):
+        tstart = clock()
+        i_mp, v_mp, p_mp = slow_mpp_jit_brentq_jit(IL.values, I0, Rs, Rsh.values, nNsVth)
+        i_mp = pd.Series(i_mp, index=IL.index)
+        v_mp = pd.Series(v_mp, index=IL.index)
+        p_mp = pd.Series(p_mp, index=IL.index)
+        tstop = clock()
+        dt_slow = tstop - tstart
+        print('%s slow_mpp_jit_brentq_jit elapsed time = %g[s]' % (n, dt_slow))
+
+    print('(singlediode - slow_mpp_jit_brentq_jit).abs()\n',
+          (singlediode_out['p_mp'] - p_mp.fillna(0)).describe())
+
+
+#     print(brentq_bishop.inspect_types())
+
+
