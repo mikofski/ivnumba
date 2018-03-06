@@ -1,0 +1,44 @@
+(numba) 10:51:43 holmgren@holmgren-mbp.local numba_mmp_testing master ? python numba_mpp_testing_clean.py
+preparing single diode data from clear sky ghi...
+number of points = 525601
+0 singlediode elapsed time = 3.32074[s]
+1 singlediode elapsed time = 3.45139[s]
+2 singlediode elapsed time = 3.30214[s]
+3 singlediode elapsed time = 3.2279[s]
+0 slow_mpp_jit elapsed time = 2.82168[s]
+1 slow_mpp_jit elapsed time = 2.30675[s]
+2 slow_mpp_jit elapsed time = 2.20894[s]
+3 slow_mpp_jit elapsed time = 2.31824[s]
+(singlediode - slow_mpp_jit).abs()
+ count    5.256010e+05
+mean    -9.334509e-05
+std      2.109775e-04
+min     -1.557723e-03
+25%     -6.835588e-05
+50%     -2.328990e-08
+75%      0.000000e+00
+max      0.000000e+00
+dtype: float64
+
+
+(numba) 11:01:05 holmgren@holmgren-mbp.local numba_mmp_testing master ? NUMBA_DISABLE_JIT=1 python numba_mpp_testing_clean.py
+preparing single diode data from clear sky ghi...
+number of points = 525601
+0 singlediode elapsed time = 3.12153[s]
+1 singlediode elapsed time = 3.20733[s]
+2 singlediode elapsed time = 3.1084[s]
+3 singlediode elapsed time = 3.14283[s]
+0 slow_mpp_jit elapsed time = 10.6972[s]
+1 slow_mpp_jit elapsed time = 10.8363[s]
+2 slow_mpp_jit elapsed time = 10.8462[s]
+3 slow_mpp_jit elapsed time = 10.7065[s]
+(singlediode - slow_mpp_jit).abs()
+ count    5.256010e+05
+mean    -9.334509e-05
+std      2.109775e-04
+min     -1.557723e-03
+25%     -6.835588e-05
+50%     -2.328990e-08
+75%      0.000000e+00
+max      0.000000e+00
+dtype: float64
