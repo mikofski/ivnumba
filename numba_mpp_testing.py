@@ -223,7 +223,7 @@ def slow_vd_jit_vec_brentq_bishop(photocurrent, saturation_current, resistance_s
 def prepare_data():
     print('preparing single diode data from clear sky ghi...')
     # adjust values to change length of test data
-    times = pd.DatetimeIndex(start='20180101', end='20190101', freq='15min', tz='America/Phoenix')
+    times = pd.DatetimeIndex(start='20180101', end='20190101', freq='1min', tz='America/Phoenix')
     location = pvlib.location.Location(32.2, -110.9, altitude=710)
     cs = location.get_clearsky(times)
     poa_data = cs['ghi']
